@@ -7,7 +7,7 @@ GitHub -> [ntrexlab/PC_AHRS_ROS2](https://github.com/ntrexlab/PC_AHRS_ROS2)
     * #### 사용모델
          - AHRS - [MW_AHRSv1](http://www.devicemart.co.kr/goods/view?no=1310790)
          - RS232_USB_커넥터 - [USB2CAN(FIFO) v2](http://www.devicemart.co.kr/goods/view?no=1323536)
-        
+         - (MW-AHRS X1은 [2th_NtrexAHRS_lib_ROS](https://github.com/ntrexlab/2th_NtrexAHRS_lib_ROS.git)의 예제 패키지를 사용해 주세요.)
 
 * ### 2.Tool
     * #### 사용버전
