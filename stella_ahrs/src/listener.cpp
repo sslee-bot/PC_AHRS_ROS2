@@ -1,18 +1,20 @@
 #include "listener.h"
 #include "MwAHRS.hpp"
 
+char data_rx[8];
+
 void *AHRS_thread(void *arg)
 {
     while (run)
     {
-        if (MW_SerialRecv(&id, &length, data))
+        if (MW_SerialRecv(&id, &length, data_rx))
         {
-            switch ((int)(unsigned char)data[1])
+            switch ((int)(unsigned char)data_rx[1])
             {
             case ACC:
-                acc_x = ((int)(unsigned char)data[2] | (int)(unsigned char)data[3] << 8);
-                acc_y = ((int)(unsigned char)data[4] | (int)(unsigned char)data[5] << 8);
-                acc_z = ((int)(unsigned char)data[6] | (int)(unsigned char)data[7] << 8);
+                acc_x = ((int)(unsigned char)data_rx[2] | (int)(unsigned char)data_rx[3] << 8);
+                acc_y = ((int)(unsigned char)data_rx[4] | (int)(unsigned char)data_rx[5] << 8);
+                acc_z = ((int)(unsigned char)data_rx[6] | (int)(unsigned char)data_rx[7] << 8);
 
                 imu->linear_acceleration.x = acc_x / 1000.0 * 9.8;
                 imu->linear_acceleration.y = acc_y / 1000.0 * 9.8;
@@ -20,9 +22,9 @@ void *AHRS_thread(void *arg)
                 break;
 
             case GYO:
-                gyo_x = ((int)(unsigned char)data[2] | (int)(unsigned char)data[3] << 8);
-                gyo_y = ((int)(unsigned char)data[4] | (int)(unsigned char)data[5] << 8);
-                gyo_z = ((int)(unsigned char)data[6] | (int)(unsigned char)data[7] << 8);
+                gyo_x = ((int)(unsigned char)data_rx[2] | (int)(unsigned char)data_rx[3] << 8);
+                gyo_y = ((int)(unsigned char)data_rx[4] | (int)(unsigned char)data_rx[5] << 8);
+                gyo_z = ((int)(unsigned char)data_rx[6] | (int)(unsigned char)data_rx[7] << 8);
 
                 imu->angular_velocity.x = gyo_x / 10.0 * 0.01745;
                 imu->angular_velocity.y = gyo_y / 10.0 * 0.01745;
@@ -30,9 +32,9 @@ void *AHRS_thread(void *arg)
                 break;
 
             case DEG:
-		        deg_x = ((int)(unsigned char)data[2] | (int)(unsigned char)data[3] << 8);
-                deg_y = ((int)(unsigned char)data[4] | (int)(unsigned char)data[5] << 8);
-                deg_z = ((int)(unsigned char)data[6] | (int)(unsigned char)data[7] << 8);
+		        deg_x = ((int)(unsigned char)data_rx[2] | (int)(unsigned char)data_rx[3] << 8);
+                deg_y = ((int)(unsigned char)data_rx[4] | (int)(unsigned char)data_rx[5] << 8);
+                deg_z = ((int)(unsigned char)data_rx[6] | (int)(unsigned char)data_rx[7] << 8);
 
                 float x = deg_x / 100.0;
                 float y = deg_y / 100.0;
@@ -49,7 +51,27 @@ void *AHRS_thread(void *arg)
 }
     int main(int argc, char **argv)
     {
-        if(MW_SerialOpen("/dev/ttyUSB0", 115200) < 0)
+        rclcpp::init(argc,argv);
+        auto node = rclcpp::Node::make_shared("stella_ahrs");
+        node->declare_parameter("port",
+                                rclcpp::ParameterType::PARAMETER_STRING);
+        node->declare_parameter("rate",
+                                rclcpp::ParameterType::PARAMETER_DOUBLE);
+
+        string port;
+        double rate;
+        if (!node->get_parameter("port", port)) {
+            RCLCPP_ERROR_STREAM(node->get_logger(), "no parameter: port");
+            return -1;
+        }
+        if (!node->get_parameter("rate", rate)) {
+            RCLCPP_ERROR_STREAM(node->get_logger(), "no parameter: rate");
+            return -1;
+        }
+
+        auto chatter_pub = node->create_publisher<sensor_msgs::msg::Imu>("imu", 13);
+
+        if(MW_SerialOpen(port.data(), 115200) < 0)
         {
             return -1;
         }
@@ -57,10 +79,6 @@ void *AHRS_thread(void *arg)
         Mw_AHRS_init(1);
 
         pthread_t thread;
-
-        rclcpp::init(argc,argv);
-        auto node = rclcpp::Node::make_shared("stella_ahrs");
-        auto chatter_pub = node->create_publisher<sensor_msgs::msg::Imu>("imu", 13);
 
         pthread_create(&thread, NULL, AHRS_thread, NULL);
 
@@ -81,7 +99,7 @@ void *AHRS_thread(void *arg)
         imu->orientation.y = 0;
         imu->orientation.z = 0;
 
-        rclcpp::WallRate rate(10);
+        rclcpp::WallRate wall_rate(rate);
         rclcpp::TimeSource ts(node);
         rclcpp::Clock::SharedPtr clock = std::make_shared<rclcpp::Clock>(RCL_ROS_TIME);
         ts.attachClock(clock);
@@ -94,7 +112,7 @@ void *AHRS_thread(void *arg)
             chatter_pub->publish(*imu);
 
             rclcpp::spin_some(node);
-            rate.sleep();
+            wall_rate.sleep();
         }
         run = false;
 	    Mw_SerialClose();

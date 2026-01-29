@@ -24,7 +24,7 @@
 
 using namespace std;
 
-char data[8];
+extern char data_rx[8];
 long id = 0;
 int length = 0;
 bool run = true;

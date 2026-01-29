@@ -1,0 +1,4 @@
+stella_ahrs_node:
+  ros__parameters:
+    port: '/dev/ttyUSB0'
+    rate: 10.0
